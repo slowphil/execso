@@ -3,7 +3,7 @@
 
 #include <unistd.h>
 
-char* const* read_parent_env();
+char* const* read_env_recursive();
 void env_free(char* const *env);
 
 #endif

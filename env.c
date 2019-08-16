@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdbool.h>
 
 static char** env_allocate(size_t size) {
     return calloc(size + 1, sizeof(char*));
@@ -41,6 +42,14 @@ void env_free(char* const *env) {
         len++;
     }
     free((char**)env);
+}
+
+size_t env_len(char* const *env) {
+    size_t len = 0;
+    while (env[len] != 0 ) {
+        len++;
+    }
+    return len;
 }
 
 static size_t get_number_of_variables(FILE *file, char **buffer, size_t *len) {
@@ -102,9 +111,40 @@ static char* const* read_env_from_process(pid_t pid) {
     return env;
 }
 
-char* const* read_parent_env() {
-    pid_t ppid = getppid();
-    return read_env_from_process(ppid);
+char* const* read_env_recursive() {
+    pid_t pid = getpid();
+    char* const* env = NULL;
+
+    int n_try = 1;
+    while (pid > 1) {
+        char buf[128];
+        sprintf(buf, "/proc/%d/stat", (int)pid);
+        FILE* fp = fopen(buf, "r");
+        if (fp == NULL) break;
+        // Ignore one number, then two strings, then read a number
+        fscanf(fp, "%*d %*s %*s %d", &pid);
+        fclose(fp);
+
+        DEBUG("read_env_recursive: try %d, PID: %d\n", n_try++, (int)pid);
+        if (env) env_free(env);
+        env = read_env_from_process(pid);
+
+
+        bool appdir_in_env = false;
+        for (size_t i = 0; i < env_len(env); i++) {
+            if (!strncmp(env[i], "APPDIR=", strlen("APPDIR="))) {
+                appdir_in_env = true;
+            }
+        }
+        if (!appdir_in_env) {
+            DEBUG("APPDIR not found in env. OK\n");
+            break;
+        } else {
+            DEBUG("APPDIR found in env. continue...\n");
+        }
+    }
+
+    return env;
 }
 
 #ifdef ENV_TEST
