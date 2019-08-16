@@ -106,29 +106,45 @@ static int exec_common(execve_func_t function, const char *filename, char* const
 int execve(const char *filename, char *const argv[], char *const envp[]) {
     DEBUG("execve call hijacked: %s\n", filename);
     execve_func_t execve_orig = dlsym(RTLD_NEXT, "execve");
-    if (!execve_orig)
+    if (!execve_orig) {
         DEBUG("Error getting execve original symbol: %s\n", strerror(errno));
+        return -1;
+    }
 
     return exec_common(execve_orig, filename, argv, envp);
 }
 
 int execv(const char *filename, char *const argv[]) {
     DEBUG("execv call hijacked: %s\n", filename);
-    return execve(filename, argv, environ);
+    execve_func_t execve_orig = dlsym(RTLD_NEXT, "execv");
+    if (!execve_orig) {
+        DEBUG("Error getting execve original symbol: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return exec_common(execve_orig, filename, argv, environ);
 }
 
 int execvpe(const char *filename, char *const argv[], char *const envp[]) {
     DEBUG("execvpe call hijacked: %s\n", filename);
     execve_func_t execve_orig = dlsym(RTLD_NEXT, "execvpe");
-    if (!execve_orig)
+    if (!execve_orig) {
         DEBUG("Error getting execvpe original symbol: %s\n", strerror(errno));
+        return -1;
+    }
 
     return exec_common(execve_orig, filename, argv, envp);
 }
 
 int execvp(const char *filename, char *const argv[]) {
     DEBUG("execvp call hijacked: %s\n", filename);
-    return execvpe(filename, argv, environ);
+    execve_func_t execve_orig = dlsym(RTLD_NEXT, "execvp");
+    if (!execve_orig) {
+        DEBUG("Error getting execvp original symbol: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return exec_common(execve_orig, filename, argv, environ);
 }
 
 #ifdef EXEC_TEST

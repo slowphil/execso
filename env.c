@@ -83,7 +83,7 @@ static char* const* env_from_buffer(FILE *file) {
         if (var_len == 0)
             break;
 
-        env[n] = calloc(sizeof(char*), var_len + 1);
+        env[n] = calloc(var_len + 1, sizeof(char));
         strncpy(env[n], ptr, var_len + 1);
         DEBUG("\tenv var copied: %s\n", env[n]);
         ptr += var_len + 1;
