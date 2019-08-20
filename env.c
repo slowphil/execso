@@ -122,7 +122,9 @@ char* const* read_env_recursive() {
         FILE* fp = fopen(buf, "r");
         if (fp == NULL) break;
         // Ignore one number, then two strings, then read a number
-        fscanf(fp, "%*d %*s %*s %d", &pid);
+        if (fscanf(fp, "%*d %*s %*s %d", &pid) < 1) {
+            DEBUG("ERROR fscanf failed\n");
+        }
         fclose(fp);
 
         DEBUG("read_env_recursive: try %d, PID: %d\n", n_try++, (int)pid);
@@ -152,7 +154,7 @@ int main() {
     putenv("APPIMAGE_CHECKRT_DEBUG=1");
     DEBUG("ENV TEST\n");
     char **env = NULL;
-    read_parent_env(&env);
+    read_env_recursive(&env);
 
     return 0;
 }
