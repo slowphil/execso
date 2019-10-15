@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <stdbool.h>
 
-static char** env_allocate(size_t size) {
+char** env_allocate(size_t size) {
     return calloc(size + 1, sizeof(char*));
 }
 
@@ -85,10 +85,11 @@ static char* const* env_from_buffer(FILE *file) {
 
         env[n] = calloc(var_len + 1, sizeof(char));
         strncpy(env[n], ptr, var_len + 1);
-        DEBUG("\tenv var copied: %s\n", env[n]);
+        //DEBUG("\tenv var copied: %s\n", env[n]);
         ptr += var_len + 1;
         n++;
     }
+    DEBUG("number of env vars copied: %zu\n", n);
     free(buffer);
 
     return env;
