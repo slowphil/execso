@@ -115,17 +115,22 @@ const char* resolve_in_path(const char* filename){ //use shell to find in PATH, 
   /* Open the command for reading. */
   fp = popen(cmd, "r");
   if (fp == NULL) {
-    DEBUG("Failed to run which command\n" );
+    DEBUG("Failed to run command -v\n" );
     return filename;
     }
   else {
     /* Read the output a line at a time - output it. */
-    if (fgets(path, PATH_MAX, fp) != NULL) {
-      DEBUG("which result %s", path);
-      }
-    /* close */
+    char* ans = fgets(path, PATH_MAX, fp);
     pclose(fp);
-    return (strlen(path)>0 ? path : filename);
+      
+    if (ans != NULL) {
+      DEBUG("command -v result %s", path);
+      return path;
+      }
+    else {
+      free(path);
+      return filename;
+      }  
     }
 }
 
