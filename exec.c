@@ -172,7 +172,7 @@ char* const* external_environment(char* const envp[]) {
                 && ( strncmp(line, "LD_LIBRARY_PATH", 15))  \
                 && ( strncmp(line, "APPDIR", 6)) \
                 ) { 
-              newenv[transfers]= envp[i];
+              newenv[transfers]= strdup(envp[i]);
               transfers++;
               }
             else {
@@ -237,7 +237,7 @@ int execve(const char *filename, char *const argv[], char *const envp[]) {
         DEBUG("passing to execve now (external process)\n");
         char* const *env = external_environment(envp);
         ret = execve_orig (filename, argv, env);
-        env_free(env);
+        if (env && (env != envp)) env_free(env);
         }
     else {
         DEBUG("passing to execve now (internal appimage process)\n");
@@ -261,7 +261,7 @@ int execvpe(const char *filename, char *const argv[], char *const envp[]) {
         DEBUG("passing to execvpe now (external process)\n");
         char* const *env = external_environment(envp);
         ret = execvpe_orig (filename, argv, env);
-        env_free(env);
+        if (env && (env != envp)) env_free(env);
         }
     else {
         DEBUG("passing to execvpe now (internal appimage process)\n");
@@ -290,7 +290,7 @@ int posix_spawnp(pid_t *pid, const char *filename,
     if (external){
         char* const *env = external_environment(envp);
         ret = posix_spawnp_orig(pid, filename, file_actions, attrp, argv, env);
-        env_free(env);
+        if (env && (env != envp)) env_free(env); 
         }
     else {
         ret = posix_spawnp_orig(pid, filename, file_actions, attrp, argv, envp);
@@ -342,7 +342,7 @@ int system(const char *cmd)
             execve_func_t execve_orig = dlsym(RTLD_NEXT, "execve");
             char* const *env = external_environment(environ);
             execve_orig ("/bin/sh", argv, env);
-            env_free(env);
+            if (env && (env != environ)) env_free(env);
             }
         else {
             DEBUG("in child, internal appimage process\n");

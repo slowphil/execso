@@ -146,7 +146,7 @@ char* const* read_env_recursive() {
             DEBUG("APPDIR found in env. continue...\n");
         }
     }
-
+    if (!env) DEBUG("***ERROR cannot obtain parent env\n");
     return env;
 }
 
