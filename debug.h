@@ -5,9 +5,9 @@
 #include <stdio.h>
 
 #define DEBUG(...) do { \
-    if (getenv("APPIMAGE_CHECKRT_DEBUG")) \
-        {printf("APPIMAGE_CHECKRT>> %s: ", __func__); \
-        printf(__VA_ARGS__);} \
+    if (getenv("APPIMAGE_EXECSO_DEBUG")) \
+        {fprintf(stderr,"EXECSO>> %s: ", __func__); \
+        fprintf(stderr,__VA_ARGS__);} \
 } while (0)
 
 #endif // DEBUG_H
