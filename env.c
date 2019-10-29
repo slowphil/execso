@@ -89,7 +89,7 @@ static char* const* env_from_buffer(FILE *file) {
         ptr += var_len + 1;
         n++;
     }
-    DEBUG("number of env vars copied: %zu\n", n);
+    //DEBUG("number of env vars copied: %zu out of %zu of max length %zu\n", n, num_vars, len);
     free(buffer);
 
     return env;
@@ -99,7 +99,7 @@ static char* const* read_env_from_process(pid_t pid) {
     char buffer[256] = {0};
 
     snprintf(buffer, sizeof(buffer), "/proc/%d/environ", pid);
-    DEBUG("Reading env from parent process: %s\n", buffer);
+    //DEBUG("Reading env from parent process: %s\n", buffer);
     FILE *env_file = fopen(buffer, "r");
     if (!env_file) {
         DEBUG("Error reading file: %s (%s)\n", buffer, strerror(errno));
@@ -113,25 +113,14 @@ static char* const* read_env_from_process(pid_t pid) {
 }
 
 char* const* read_env_recursive() {
-    pid_t pid = getpid();
+    pid_t pid = getppid();
     char* const* env = NULL;
 
     int n_try = 1;
     while (pid > 1) {
-        char buf[128];
-        sprintf(buf, "/proc/%d/stat", (int)pid);
-        FILE* fp = fopen(buf, "r");
-        if (fp == NULL) break;
-        // Ignore one number, then two strings, then read a number
-        if (fscanf(fp, "%*d %*s %*s %d", &pid) < 1) {
-            DEBUG("ERROR fscanf failed\n");
-        }
-        fclose(fp);
-
         DEBUG("read_env_recursive: try %d, PID: %d\n", n_try++, (int)pid);
         if (env) env_free(env);
         env = read_env_from_process(pid);
-
 
         bool appdir_in_env = false;
         for (size_t i = 0; i < env_len(env); i++) {
@@ -140,20 +129,37 @@ char* const* read_env_recursive() {
             }
         }
         if (!appdir_in_env) {
-            DEBUG("APPDIR not found in env. OK\n");
+            //DEBUG("APPDIR not found in env. OK\n");
             break;
         } else {
-            DEBUG("APPDIR found in env. continue...\n");
+            //DEBUG("APPDIR found in env. continue...\n");
+            char buf[128];
+            sprintf(buf, "/proc/%d/stat", (int)pid);
+            FILE* fp = fopen(buf, "r");
+            if (fp == NULL) {
+              DEBUG("ERROR could not open /proc/%d/stat\n", (int)pid);
+              break;
+              }
+            // Ignore one number, then two strings, then read a number
+            if (fscanf(fp, "%*d %*s %*s %d", &pid) < 1) {
+                DEBUG("ERROR fscanf failed\n");
+        }
+        fclose(fp);
         }
     }
-    if (!env) DEBUG("***ERROR cannot obtain parent env\n");
+    if (!env) {
+      DEBUG("***ERROR cannot obtain parent env\n");
+      }
+    //else {
+      //DEBUG("returning env size %zu\n", env_len(env));
+      //}
     return env;
 }
 
 #ifdef ENV_TEST
 int main() {
-    putenv("APPIMAGE_CHECKRT_DEBUG=1");
-    DEBUG("ENV TEST\n");
+    putenv("APPIMAGE_EXECSO_DEBUG=1");
+    //DEBUG("ENV TEST\n");
     char **env = NULL;
     read_env_recursive(&env);
 

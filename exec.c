@@ -61,10 +61,10 @@
  *    
  *    For TeXmacs, one could for instance set APPIMAGE_PRESERVE_ENV_PREFIX=TEXMACS_
  *    However in TeXmacs this last approach fails when launching a Shell plugin: it
- *    ends up with an empty environment and pipe communications with TeXmacs not
- *    working... (For some yet unknown reason there seems to be an error while working
- *    out the ancestors' environment.)
- *    The other method works.
+ *    needs the environment variable PS1="tmshell$ " which is not inherited from the
+ *    ancestors and not prefixed by TEXMACS_ contrarily to the above assumption...
+ *    The other method works fine for that plugin (and others too). Keeping the code
+ *    if it can be usefull for another AppImage.
  * 
  *  Note: If the application calls "system()" for internal appimage processes, you need to
  *    embbed a shell interpreter in the AppImage under $APPDIR/bin/sh. e.g.:
@@ -107,7 +107,7 @@ const char* resolve_in_path(const char* filename){ //use shell to find in PATH, 
 
   //snprintf(cmd, sizeof(cmd), "PATH=%s /bin/which %s", getenv("PATH") , filename);
   //snprintf(cmd, sizeof(cmd), "/bin/which %s", filename);
-  snprintf(cmd, sizeof(cmd), "command -v %s", filename); //works for 3a ,but tm_shell does not work with 3b 
+  snprintf(cmd, sizeof(cmd), "command -v %s", filename); //works better
 
   FILE *fp;
   char *path = calloc(PATH_MAX , sizeof(char));
@@ -115,7 +115,7 @@ const char* resolve_in_path(const char* filename){ //use shell to find in PATH, 
   /* Open the command for reading. */
   fp = popen(cmd, "r");
   if (fp == NULL) {
-    DEBUG("Failed to run command -v\n" );
+    //DEBUG("Failed to run command -v\n" );
     return filename;
     }
   else {
@@ -124,7 +124,7 @@ const char* resolve_in_path(const char* filename){ //use shell to find in PATH, 
     pclose(fp);
       
     if (ans != NULL) {
-      DEBUG("command -v result %s", path);
+      //DEBUG("command -v result %s", path);
       return path;
       }
     else {
@@ -138,12 +138,12 @@ static int is_external_process(const char *filename) {
     const char *appdir = getenv("APPDIR");
     if (!appdir)
         return 0;
-    DEBUG("APPDIR = %s\n", appdir);
+    //DEBUG("APPDIR = %s\n", appdir);
     const char *fullpath = canonicalize_file_name(filename);
-    DEBUG("command %s, canonical path %s\n", filename, fullpath);
+    //DEBUG("command %s, canonical path %s\n", filename, fullpath);
     if (!fullpath) {
          fullpath = resolve_in_path (filename);
-         DEBUG("fullpath from resolve_in_path %s\n", fullpath);
+         //DEBUG("fullpath from resolve_in_path %s\n", fullpath);
          }
 
     int ret = strncmp(fullpath, appdir, MIN(strlen(fullpath), strlen(appdir)));
@@ -153,7 +153,7 @@ static int is_external_process(const char *filename) {
 }
 
 char* const* external_environment(char* const envp[]) {
-    DEBUG("External process detected. Restoring env vars.\n");
+    //DEBUG("External process detected. Restoring env vars.\n");
     //DEBUG("current process PID: %d\n", getpid());
 
     const char *RESTORE_ENV_PREFIX = getenv(APPIMAGE_PRESERVE_ENV_PREFIX);
@@ -161,8 +161,11 @@ char* const* external_environment(char* const envp[]) {
     int transfers = 0 ;
     int i;
     char** newenv = NULL;
+    char* const* gpenv = NULL;
+    char** tmpenv = NULL;
+
     if (!RESTORE_ENV_PREFIX) {
-        DEBUG("Environment prefix to pass to child not defined in %s\n", APPIMAGE_PRESERVE_ENV_PREFIX);
+        //DEBUG("Environment prefix to pass to child not defined in %s\n", APPIMAGE_PRESERVE_ENV_PREFIX);
         //simply cleanup environment of LD_PRELOAD and LD_LIBRARY_PATH
         //(we assume they were not set before starting the appimage)
         newenv = env_allocate(envc); 
@@ -175,35 +178,33 @@ char* const* external_environment(char* const envp[]) {
               newenv[transfers]= strdup(envp[i]);
               transfers++;
               }
-            else {
-              DEBUG("Removing from env : %s\n", line);
-              }
+            //else DEBUG("Removing from env : %s\n", line);
             }
-        DEBUG("Found %d env variables to pass\n", transfers);    
+        //DEBUG("Found %d env variables to pass\n", transfers);    
         newenv[transfers]=0;
         }
     else {
         int prefix_len = strlen(RESTORE_ENV_PREFIX);
-        char** tmpenv = env_allocate(envc); 
+        tmpenv = env_allocate(envc); 
         for ( i = 0; i < envc; i++ ) {
             char* line = envp[i];
             if ( !strncmp(line, RESTORE_ENV_PREFIX, prefix_len) ) { //an environment variable starts with the keyword, we should transfer it
-              //DEBUG("Found prefixed env variables : %s\n", line);
+              ////DEBUG("Found prefixed env variables : %s\n", line);
               tmpenv[transfers]= envp[i];
               transfers++;
               }
             else if ( !strncmp(line, "PATH=", 5) ) {
-              DEBUG("saving PATH : %s\n", line);
+              //DEBUG("saving PATH : %s\n", line);
               tmpenv[transfers]= envp[i];
               transfers++;
               }
             }
-        DEBUG("Found %d env variables to pass\n", transfers);    
+        //DEBUG("Found %d env variables to pass\n", transfers);    
         
         //now copy grandparent env and add to it the env variable we want to transfer
-        char* const* gpenv = read_env_recursive();
+        gpenv = read_env_recursive();
         int gpenvc = env_len(gpenv);
-        char** newenv = env_allocate(gpenvc + transfers); //larger new env
+        newenv = env_allocate(gpenvc + transfers); //larger new env
         // copy grandparent env in new env
         int j = 0;
         for ( i = 0; i < gpenvc ; i++ ) {
@@ -212,7 +213,7 @@ char* const* external_environment(char* const envp[]) {
                j++;
                }
             }
-        DEBUG("newenv: %zu\n", env_len(newenv));   
+        //DEBUG("newenv: %zu\n", env_len(newenv));   
             
         if (transfers > 0) {
             for ( i = 0; i < transfers; i++ ) {
@@ -220,28 +221,47 @@ char* const* external_environment(char* const envp[]) {
                 //DEBUG("copying : %s\n", tmpenv[i]);
                 }
             }
-        DEBUG("oldenv: %zu ; tmpenv: %zu ; gpenv: %d ; newenv: %zu\n", env_len(envp), env_len(tmpenv), gpenvc, env_len(newenv));   
+        DEBUG("oldenv: %zu ; tmpenv: %zu ; gpenv: %zu ; newenv: %zu\n", env_len(envp), env_len(tmpenv), env_len(gpenv), env_len(newenv));   
         newenv[j+transfers]=0;
         env_free(gpenv);
         free(tmpenv);
     }
-    return (char* const*) newenv;
+    DEBUG("return: %zu \n", env_len(newenv));
+    return newenv;
 }
 
 int execve(const char *filename, char *const argv[], char *const envp[]) {
     DEBUG("execv(e) call hijacked: %s\n", filename);
-    int external = is_external_process(filename);
+    const char *realcmd;
+    if (!strncmp(filename, "/bin/sh", 7) && !strncmp(argv[0] , "sh",2) && !strncmp(argv[1] , "-c",2)){
+      realcmd =  argv[2];
+      }
+    else {
+      realcmd = filename;
+      }
+      
+    int external = is_external_process(realcmd);
+    DEBUG("COMMAND %s REALCOMMAND %s EXTERNAL %d \n", filename, realcmd, external);  
     int ret;
     execve_func_t execve_orig = dlsym(RTLD_NEXT, "execve");
     if (external){ 
-        DEBUG("passing to execve now (external process)\n");
+        DEBUG("external process passing to execve %s\n", filename);
         char* const *env = external_environment(envp);
         ret = execve_orig (filename, argv, env);
         if (env && (env != envp)) env_free(env);
         }
     else {
-        DEBUG("passing to execve now (internal appimage process)\n");
-        ret = execve_orig (filename, argv, envp);
+        if (realcmd == filename) {
+          DEBUG("internal appimage process passing to execve %s\n", filename);
+          ret = execve_orig (filename, argv, envp);
+          }
+        else {
+          const char *appdir=getenv("APPDIR");
+          char buf[strlen(appdir)+8];
+          snprintf(buf, sizeof buf, "%s%s", appdir, "/bin/sh");
+          DEBUG("internal appimage process passing to execve %s\n", buf);
+          ret = execve_orig (buf, argv, envp);
+          }
         }
     return ret;
 }
@@ -254,18 +274,35 @@ int execv(const char *filename, char *const argv[]) {
 
 int execvpe(const char *filename, char *const argv[], char *const envp[]) {
     DEBUG("execvp(e) call hijacked: %s\n", filename);
-    int external = is_external_process(filename);
+    const char *realcmd;
+    if (!strncmp(filename, "/bin/sh", 7) && !strncmp(argv[0] , "sh",2) && !strncmp(argv[1] , "-c",2)){
+      realcmd =  argv[2];
+      }
+    else {
+      realcmd = filename;
+      }
+    int external = is_external_process(realcmd);
+    DEBUG("COMMAND %s REALCOMMAND %s EXTERNAL %d \n", filename, realcmd, external);  
     int ret;
     execve_func_t execvpe_orig = dlsym(RTLD_NEXT, "execvpe");
     if (external){ 
-        DEBUG("passing to execvpe now (external process)\n");
+        DEBUG("external appimage process passing to execve %s\n", filename);
         char* const *env = external_environment(envp);
         ret = execvpe_orig (filename, argv, env);
         if (env && (env != envp)) env_free(env);
         }
     else {
-        DEBUG("passing to execvpe now (internal appimage process)\n");
-        ret = execvpe_orig (filename, argv, envp);
+        if (realcmd == filename) {
+          DEBUG("internal appimage process passing to execvpe %s\n", filename);
+          ret = execvpe_orig (filename, argv, envp);
+          }
+        else {
+          const char *appdir=getenv("APPDIR");
+          char buf[strlen(appdir)+8];
+          snprintf(buf, sizeof buf, "%s%s", appdir, "/bin/sh");
+          DEBUG("internal appimage process passing to execvpe %s\n", buf);
+          ret = execvpe_orig (buf , argv, envp);
+          }
         }
     return ret;
 }
@@ -285,15 +322,35 @@ int posix_spawnp(pid_t *pid, const char *filename,
         DEBUG("Error getting posix_spawnp original symbol: %s\n", strerror(errno));
         return -1;
         }
-    int external = is_external_process(filename);
+    const char *realcmd;
+    if (!strncmp(filename, "/bin/sh", 7) && !strncmp(argv[0], "sh", 2) && !strncmp(argv[1], "-c", 2)){
+      realcmd =  argv[2];
+      }
+    else {
+      realcmd = filename;
+      }
+      
+    int external = is_external_process(realcmd);
     int ret;
     if (external){
         char* const *env = external_environment(envp);
+        DEBUG("external appimage process passing to spawnp %s\n", filename);
         ret = posix_spawnp_orig(pid, filename, file_actions, attrp, argv, env);
         if (env && (env != envp)) env_free(env); 
         }
     else {
-        ret = posix_spawnp_orig(pid, filename, file_actions, attrp, argv, envp);
+        if (realcmd == filename) {
+          DEBUG("internal appimage process passing to spawnp %s\n", filename);
+          ret = posix_spawnp_orig(pid, filename, file_actions, attrp, argv, envp);
+          }
+        else {
+          const char *appdir=getenv("APPDIR");
+          char buf[strlen(appdir)+8];
+          snprintf(buf, sizeof buf, "%s%s", appdir, "/bin/sh");
+          DEBUG("internal appimage process passing to spawnp %s\n", buf);
+          ret = posix_spawnp_orig(pid, buf, file_actions, attrp, argv, envp);
+          }
+
         }
     return ret;
 }
@@ -374,7 +431,7 @@ int system(const char *cmd)
 
 #ifdef EXEC_TEST
 int main(int argc, char *argv[]) {
-    putenv("APPIMAGE_CHECKRT_DEBUG=1");
+    putenv("APPIMAGE_EXECSO_DEBUG=1");
     DEBUG("EXEC TEST\n");
     execv("./env_test", argv);
 
