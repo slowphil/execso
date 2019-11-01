@@ -2,12 +2,18 @@
 
 GNU-TeXmacs relies on external tools provided by the distribution (for instance, `Ghostscript`) and may also launch external processes for many of its possible "plugins" sessions (python, maxima, R ...)
 
-However, when such a process external to the Appimage is launched by TeXmacs, it must not blindly inherit the process environment of the AppImage binary, and notably not the `LD_LIBRARY_PATH` which points to libraries inside the Appimage (e.g. `freetype`) and which are most likely incompatible with the distribution's libraries expected by the external process.
+However, when such a process external to the Appimage is launched by TeXmacs, it must not blindly inherit the process environment of the AppImage binary, and notably not a `LD_LIBRARY_PATH` which would point to libraries inside the Appimage (e.g. `freetype`) and which are most likely incompatible with the distribution's libraries expected by the external process.
 
-# The solution 
+# The simple solution : use a custom AppRun script
 
-This repo provides a library `exec.so` whose purpose is to restore a suitable environment for processes that are called 
-outside of the AppImage. In particular it unsets the `LD_LIBRARY_PATH` that points
+When `linuxdeplyoqt` builds an AppImage, it recursively determines the full set of libraries to embed in the AppImage for the application to work. Then, it patches all these binary files so that they point to each other by their relative path. In principle no other action is required for the AppImage to run properly. In particular one does not need to set LD_LIBRARY_PATH to point inside the AppImage. UNFORTUANTELY, by default `linuxdeplyqt` deploys a binary AppRun that sets LD_LIBRARY_PATH=$APPDIR/usr/lib which cause some external applications to fail, as explained above.
+
+The simple fix is thus to replace `linuxdeplyoqt`'s default binary AppRun by a custom script, not setting LD_LIBRARY_PATH. This is actually enough for TeXmacs plugins to work, but I figured that only after I had the complicated solution working! I keep this repo around in case it can be useful for other AppImages.
+
+
+# The complicated solution : use this library
+
+In cases where the above simple solution is not enough, this repo provides a library `exec.so` whose purpose is to restore a suitable environment for processes that are called outside of the AppImage. In particular it unsets the `LD_LIBRARY_PATH` that points
 to libraries bundled with the AppImage that may clash with the distribution's version
 expected by the external processes. 
 

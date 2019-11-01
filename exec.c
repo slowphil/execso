@@ -23,53 +23,12 @@
 /*
  * This exec.so library is intended to be used together with the AppImage distribution
  * mechanism. 
+ * 
  * Its purpose is to restore a suitable environment for processes that are called 
- * outside of the AppImage. In particular it unsets the LD_LIBRARY_PATH that points
- * to libraries bundled with the AppImage that may clash with the distribution's version
- * expected by the external processes. 
+ * outside of the AppImage.
  * 
- * Usage is as follows:
- *
- * 1. AppRun injects this library to the dynamic loader through LD_PRELOAD so that it
- *    masks the standard execve, system etc. UNIX functions.
- *    e.g `export LD_PRELOAD=$APPDIR/usr/optional/exec.so` 
- *    Apprun also sets LD_LIBRARY_PATH, typically to $APPDIR/usr/lib for the AppImage 
- *    executable to find its libraries.
- *
- * 2. This library will intercept calls to create new processes and will try to figure whether
- *    those calls are for binaries within the AppImage bundle or external ones.
- *    (note that is is not presently foolproof: if you call an script inside the appimage 
- *    marked as executable but with the interpreter outside of the appimage, it will not
- *    recognize it is an external process).  
- *
- * 3. In case it's an internal process, it will not change anything.
- *    In case it's an external process, the behavior depends whether the 
- *    environment variable APPIMAGE_PRESERVE_ENV_PREFIX is not set or not:
- * 
- * 3a. if APPIMAGE_PRESERVE_ENV_PREFIX is not set to a value
- *    remove the LD_PRELOAD , LD_LIBRARY_PATH and APPDIR
- *    entries from the environment of the new process. Any other environment 
- *    variables set by the AppImaged program are thus passed onto the child process.
- * 
- * 3b. if APPIMAGE_PRESERVE_ENV_PREFIX is set to a value 
- *    we search up the process tree the first process that is not in the appimage
- *    (APPDIR not set) and copy its _initial_ environment (from /proc/<pid>/environ)
- *    to a new environment. Then, we add to the new environment
- *    any entry of the current environment that starts with the defined prefix and
- *    launch the new process with the new environment. This assumes all the 
- *    env variable the program needs to pass to the child begin with that prefix.
- *    
- *    For TeXmacs, one could for instance set APPIMAGE_PRESERVE_ENV_PREFIX=TEXMACS_
- *    However in TeXmacs this last approach fails when launching a Shell plugin: it
- *    needs the environment variable PS1="tmshell$ " which is not inherited from the
- *    ancestors and not prefixed by TEXMACS_ contrarily to the above assumption...
- *    The other method works fine for that plugin (and others too). Keeping the code
- *    if it can be usefull for another AppImage.
- * 
- *  Note: If the application calls "system()" for internal appimage processes, you need to
- *    embbed a shell interpreter in the AppImage under $APPDIR/bin/sh. e.g.:
- *    cp /bin/bash $BUILD_APPDIR/bin ; ln -srT $BUILD_APPDIR/bin/bash $BUILD_APPDIR/bin/sh
- * 
+ * IMPORTANT NOTE: using this library may not be needed to solve your problem! see 
+ * https://github.com/slowphil/execso/blob/master/README.md
  */
 
 #define _GNU_SOURCE
@@ -166,7 +125,7 @@ char* const* external_environment(char* const envp[]) {
 
     if (!RESTORE_ENV_PREFIX) {
         //DEBUG("Environment prefix to pass to child not defined in %s\n", APPIMAGE_PRESERVE_ENV_PREFIX);
-        //simply cleanup environment of LD_PRELOAD and LD_LIBRARY_PATH
+        //simply cleanup environment of APPDIR, LD_PRELOAD and LD_LIBRARY_PATH
         //(we assume they were not set before starting the appimage)
         newenv = env_allocate(envc); 
         for ( i = 0; i < envc; i++ ) {
